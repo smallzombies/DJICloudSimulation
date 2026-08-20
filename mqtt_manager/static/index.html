@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input.error {
+            border-color: #e74c3c;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status-section.visible {
+            display: block;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-indicator.connected {
+            background: #27ae60;
+        }
+
+        .status-text {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .config-info {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .config-value {
+            color: #333;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .alert.error {
+            background: #fdeaea;
+            color: #e74c3c;
+            border: 1px solid #fbd5d5;
+        }
+
+        .alert.success {
+            background: #e8f8f0;
+            color: #27ae60;
+            border: 1px solid #c3f0d9;
+        }
+
+        .alert.visible {
+            display: block;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 MQTT Manager</h1>
+        <p class="subtitle">Configure and manage your MQTT connection</p>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="mqttForm">
+            <div class="form-group">
+                <label for="host">MQTT Broker Host *</label>
+                <input type="text" id="host" name="host" placeholder="e.g., broker.mqtt.com" required>
+                <div class="error-message" id="hostError">Host cannot be empty</div>
+            </div>
+
+            <div class="form-group">
+                <label for="port">Port *</label>
+                <input type="number" id="port" name="port" value="1883" min="1" max="65535" required>
+                <div class="error-message" id="portError">Port must be between 1 and 65535</div>
+            </div>
+
+            <div class="form-group">
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
+                <div class="error-message" id="usernameError">Username cannot be empty</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+                <div class="error-message" id="passwordError">Password cannot be empty</div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                Connect to MQTT Broker
+            </button>
+        </form>
+
+        <div id="statusSection" class="status-section">
+            <div class="status-header">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span class="status-text" id="statusText">Connection Status</span>
+            </div>
+
+            <div class="config-info" id="configInfo">
+                <div class="config-item">
+                    <span class="config-label">Host:</span>
+                    <span class="config-value" id="displayHost"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Port:</span>
+                    <span class="config-value" id="displayPort"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Username:</span>
+                    <span class="config-value" id="displayUsername"></span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">Last Updated:</span>
+                    <span class="config-value" id="displayUpdated"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        // DOM elements
+        const form = document.getElementById('mqttForm');
+        const alertDiv = document.getElementById('alert');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusSection = document.getElementById('statusSection');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        // Form inputs
+        const hostInput = document.getElementById('host');
+        const portInput = document.getElementById('port');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+
+        // Display elements
+        const displayHost = document.getElementById('displayHost');
+        const displayPort = document.getElementById('displayPort');
+        const displayUsername = document.getElementById('displayUsername');
+        const displayUpdated = document.getElementById('displayUpdated');
+
+        // Show alert message
+        function showAlert(message, type = 'error') {
+            alertDiv.textContent = message;
+            alertDiv.className = `alert ${type} visible`;
+            setTimeout(() => {
+                alertDiv.classList.remove('visible');
+            }, 5000);
+        }
+
+        // Clear form errors
+        function clearErrors() {
+            document.querySelectorAll('.error-message').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('input').forEach(el => {
+                el.classList.remove('error');
+            });
+        }
+
+        // Show field error
+        function showFieldError(fieldId, message) {
+            const input = document.getElementById(fieldId);
+            const errorDiv = document.getElementById(`${fieldId}Error`);
+            input.classList.add('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Validate form
+        function validateForm() {
+            clearErrors();
+            let isValid = true;
+
+            if (!hostInput.value.trim()) {
+                showFieldError('host', 'Host cannot be empty');
+                isValid = false;
+            }
+
+            const port = parseInt(portInput.value);
+            if (!port || port < 1 || port > 65535) {
+                showFieldError('port', 'Port must be between 1 and 65535');
+                isValid = false;
+            }
+
+            if (!usernameInput.value.trim()) {
+                showFieldError('username', 'Username cannot be empty');
+                isValid = false;
+            }
+
+            if (!passwordInput.value.trim()) {
+                showFieldError('password', 'Password cannot be empty');
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // Update status display
+        function updateStatusDisplay(config, connected, error) {
+            statusSection.classList.add('visible');
+            
+            if (connected) {
+                statusIndicator.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusIndicator.classList.remove('connected');
+                statusText.textContent = error ? `Disconnected: ${error}` : 'Disconnected';
+            }
+
+            if (config) {
+                displayHost.textContent = config.host;
+                displayPort.textContent = config.port;
+                displayUsername.textContent = config.username;
+                displayUpdated.textContent = config.updated_at;
+            }
+        }
+
+        // Load saved configuration on page load
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // Populate form with saved config
+                    hostInput.value = data.data.host;
+                    portInput.value = data.data.port;
+                    usernameInput.value = data.data.username;
+                    // Don't populate password for security
+                    
+                    // Check connection status
+                    checkConnectionStatus();
+                }
+            } catch (error) {
+                console.log('No saved configuration or error loading:', error);
+            }
+        }
+
+        // Check connection status
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                
+                updateStatusDisplay(data.config, data.connected, data.error);
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!validateForm()) {
+                return;
+            }
+
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span>Connecting...';
+
+            const config = {
+                host: hostInput.value.trim(),
+                port: parseInt(portInput.value),
+                username: usernameInput.value.trim(),
+                password: passwordInput.value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.success) {
+                        showAlert(data.message, 'success');
+                        
+                        // Update status display
+                        if (data.data) {
+                            checkConnectionStatus();
+                        }
+                    } else {
+                        showAlert(data.message, 'error');
+                    }
+                } else {
+                    showAlert(data.message || 'Failed to save configuration', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            } finally {
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Connect to MQTT Broker';
+            }
+        });
+
+        // Load configuration on page load
+        loadConfig();
+    </script>
+</body>
+</html>
