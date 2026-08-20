@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>MQTT 登录</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 560px;
+            margin: 40px auto;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 22px;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 14px;
+            border: 1px solid transparent;
+        }
+
+        .badge.connected {
+            background: #dcfce7;
+            color: #15803d;
+            border-color: #86efac;
+        }
+
+        .badge.connecting {
+            background: #dbeafe;
+            color: #1d4ed8;
+            border-color: #93c5fd;
+        }
+
+        .badge.disconnected {
+            background: #e5e7eb;
+            color: #4b5563;
+            border-color: #d1d5db;
+        }
+
+        .form-item {
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 12px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .toast {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: white;
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: .2s;
+            max-width: 360px;
+            z-index: 999;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success {
+            background: #16a34a;
+        }
+
+        .toast.error {
+            background: #dc2626;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>MQTT 登录配置</h1>
+
+    <div class="status-bar">
+        <span>状态：</span>
+        <span id="statusBadge" class="badge disconnected">MQTT：未连接</span>
+    </div>
+
+    <form id="mqttForm">
+        <div class="row">
+            <div class="form-item">
+                <label for="host">MQTT 地址</label>
+                <input id="host" placeholder="例如：127.0.0.1" value="127.0.0.1"/>
+            </div>
+
+            <div class="form-item">
+                <label for="port">端口</label>
+                <input id="port" type="number" min="1" max="65535" value="1883"/>
+            </div>
+        </div>
+
+        <div class="form-item">
+            <label for="username">用户名（选填）</label>
+            <input id="username" autocomplete="username"/>
+        </div>
+
+        <div class="form-item">
+            <label for="password">密码（选填）</label>
+            <input id="password" type="password" autocomplete="current-password"/>
+        </div>
+
+        <div class="form-item">
+            <label for="clientId">Client ID（可选）</label>
+            <input id="clientId" placeholder="留空则自动生成"/>
+        </div>
+
+        <div class="actions">
+            <button type="button" id="loginBtn" class="primary">登录 / 连接</button>
+            <button type="button" id="logoutBtn" class="secondary">断开</button>
+        </div>
+    </form>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    const host = document.getElementById("host");
+    const port = document.getElementById("port");
+    const username = document.getElementById("username");
+    const password = document.getElementById("password");
+    const clientId = document.getElementById("clientId");
+
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    let toastTimer = null;
+
+    function showToast(message, type = "success") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = `toast show ${type}`;
+
+        clearTimeout(toastTimer);
+
+        toastTimer = setTimeout(() => {
+            toast.className = "toast";
+        }, 2500);
+    }
+
+    function setBadge(state, message) {
+        const badge = document.getElementById("statusBadge");
+
+        let className = "disconnected";
+        let text = "MQTT：未连接";
+
+        if (state === "connected") {
+            className = "connected";
+            text = "MQTT：已连接";
+        } else if (state === "connecting") {
+            className = "connecting";
+            text = "MQTT：连接中";
+        }
+
+        badge.className = `badge ${className}`;
+        badge.textContent = text;
+
+        if (message) {
+            badge.title = message;
+        }
+    }
+
+    // 必须是 async function
+    async function refreshStatus() {
+        try {
+            const res = await fetch("/api/mqtt/status");
+
+            if (!res.ok) {
+                setBadge("disconnected", "后端不可用");
+                return;
+            }
+
+            const data = await res.json();
+            setBadge(data.state, data.message);
+        } catch (e) {
+            setBadge("disconnected", "无法获取状态");
+        }
+    }
+
+    // 必须是 async function
+    async function loadConfig() {
+        try {
+            const res = await fetch("/api/mqtt/config");
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (data.saved && data.config) {
+                host.value = data.config.host || "";
+                port.value = data.config.port || 1883;
+                username.value = data.config.username || "";
+                password.value = ""; // 密码不返回，强制留空
+                clientId.value = data.config.client_id || "";
+
+                // 保存原始配置，用于后续判断是否使用存储的密码
+                window.savedConfig = {
+                    host: data.config.host,
+                    port: data.config.port,
+                    username: data.config.username
+                };
+            } else {
+                window.savedConfig = null;
+            }
+        } catch (e) {
+            console.error(e);
+            window.savedConfig = null;
+        }
+    }
+
+    // 必须是 async function
+    async function login() {
+        const currentHost = host.value.trim();
+        const currentPort = Number(port.value);
+        const currentUsername = username.value.trim();
+        const currentPassword = password.value;
+
+        let payloadPassword = currentPassword; // 默认发送字符串
+
+        // 核心修复：判断是否应该使用存储的密码
+        // 条件：1. 密码框为空  2. 用户名不为空 (匿名登录不用存储密码)  3. 账号信息与保存的一致
+        if (currentPassword === "" && currentUsername !== "" && window.savedConfig) {
+            if (window.savedConfig.host === currentHost &&
+                window.savedConfig.port === currentPort &&
+                window.savedConfig.username === currentUsername) {
+                payloadPassword = null; // 发送 null，告诉后端“使用存储的密码”
+            }
+        }
+
+        const payload = {
+            host: currentHost,
+            port: currentPort,
+            username: currentUsername,
+            password: payloadPassword, // null 或 字符串
+            client_id: clientId.value.trim() || null
+        };
+
+        if (!payload.host) {
+            showToast("MQTT地址不可为空", "error");
+            return;
+        }
+
+        if (!payload.port || payload.port <= 0 || payload.port > 65535) {
+            showToast("MQTT端口不合法", "error");
+            return;
+        }
+
+        loginBtn.disabled = true;
+
+        try {
+            const res = await fetch("/api/mqtt/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                showToast(data?.error || `请求失败(${res.status})`, "error");
+                return;
+            }
+
+            if (data.success) {
+                showToast("登录成功", "success");
+            } else {
+                showToast(data.message || "登录失败", "error");
+            }
+
+            await refreshStatus();
+        } catch (e) {
+            showToast("请求失败: " + e, "error");
+        } finally {
+            loginBtn.disabled = false;
+        }
+    }
+
+    // 必须是 async function
+    async function logout() {
+        try {
+            const res = await fetch("/api/mqtt/logout", {
+                method: "POST"
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                showToast(data?.error || `请求失败(${res.status})`, "error");
+                return;
+            }
+
+            showToast(data?.message || "已断开连接", "success");
+
+            await refreshStatus();
+        } catch (e) {
+            showToast("请求失败: " + e, "error");
+        }
+    }
+
+    // 事件绑定：回调函数内部调用 async 函数，不需要 await
+    loginBtn.addEventListener("click", () => {
+        login();
+    });
+
+    logoutBtn.addEventListener("click", () => {
+        logout();
+    });
+
+    // 顶层调用：不要加 await
+    loadConfig();
+    refreshStatus();
+
+    setInterval(() => {
+        refreshStatus();
+    }, 2000);
+</script>
+</body>
+</html>
