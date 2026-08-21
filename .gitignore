@@ -1,0 +1,63 @@
+```
+# Rust-specific ignores
+target/
+Cargo.lock
+**/*.rs.bk
+**/*.tmp
+
+# Dependencies
+**/node_modules/
+**/.venv/
+**/venv/
+**/__pycache__/
+**/.mypy_cache/
+**/.pytest_cache/
+**/.gradle/
+
+# Build artifacts
+**/dist/
+**/build/
+**/target/
+
+# Editor/IDE files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*.tmp
+
+# System files
+**/.DS_Store
+**/Thumbs.db
+**/.env
+**/.env.local
+**/*.env.*
+
+# Logs
+**/*.log
+
+# Coverage
+**/coverage/
+**/htmlcov/
+**/.coverage
+
+# Compressed files
+**/*.zip
+**/*.gz
+**/*.tar
+**/*.tgz
+**/*.bz2
+**/*.xz
+**/*.7z
+**/*.rar
+**/*.zst
+**/*.lz4
+**/*.lzh
+**/*.cab
+**/*.arj
+**/*.rpm
+**/*.deb
+**/*.Z
+**/*.lz
+**/*.lzo
+```
